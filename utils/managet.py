@@ -1,5 +1,3 @@
-import re
-
 import requests
 
 from parser import Parser

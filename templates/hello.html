@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1 class="title">{% block title %} App Parsed Data {% endblock %}</h1>
+    <div class="content">
+        {% for app in data %}
+            <div class="student">
+                <p><b>#{{ app.id }}</b></p>
+                <b>
+                    <p class="name">{{ app.app_name }}</p>
+                </b>
+                <p>
+                  {% if app.email %}
+                    {{ app.email }}
+                  {% endif %}
+                </p>
+                <p>Developer: {{ app.company_name }}</p>
+                <div class="bio">
+                    <h4>Release Year</h4>
+                    <p>{{ app.release_year }}</p>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}
