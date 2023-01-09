@@ -2,7 +2,6 @@ from datetime import datetime
 
 from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy_utils import EmailType
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///lingvanex_test.db"
@@ -26,5 +25,10 @@ class Application(db.Model):
 
 @app.route('/')
 def get_all_apps():
+    all_apps_data = Application.query.all()
+    return render_template('hello.html', data=all_apps_data)
+
+@app.route('/parse')
+def parse_site():
     all_apps_data = Application.query.all()
     return render_template('hello.html', data=all_apps_data)
