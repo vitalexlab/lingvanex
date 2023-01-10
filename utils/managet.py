@@ -1,15 +1,20 @@
 import re
 import time
+from multiprocessing import Pool
 
-from ping3 import ping
+from bs4 import BeautifulSoup, element
 from selenium import webdriver
-from bs4 import BeautifulSoup
+from selenium.webdriver.common.by import By
 
 
-def get_soup_from_file(html_path: str):
+
+
+def get_links_from_file(html_path: str):
     with open(html_path) as site_source:
         source = site_source.read()
-    return BeautifulSoup(source, 'lxml')
+    product_divs = get_soup(source).find_all('a', attrs={'class': 'product_card_title title'})
+    product_links = list(map(get_product_abs_link, product_divs))
+    return product_links
 
 
 def get_soup(text: str):
@@ -17,23 +22,25 @@ def get_soup(text: str):
     return soup
 
 
-def get_parsed_data(item: str) -> dict:
-    pass
-
-
-def get_html(driver_location: str, link: str, page_source=None):
-    driver = webdriver.Chrome(executable_path=driver_location)
+def get_driver(path_to_driver: str):
+    driver = webdriver.Chrome(executable_path=path_to_driver)
     driver.maximize_window()
-    ping_time = ping(link, unit='s')
-    sleep_time = ping_time + 5
+    return driver
+
+
+def get_main_html(
+        driver, link: str,
+        page_source=None, step=1000, range_=6
+):
+    sleep_time = 1
     try:
         driver.get(url=link)
         time.sleep(sleep_time)
-        for i in range(16):
-            i += 600 * i
-            j = 600 + i
+        for i in range(range_):
+            i += step * i
+            j = step + i
             driver.execute_script(f"window.scrollTo({i}, {j})")
-            time.sleep(3)
+            time.sleep(1)
         page_source = driver.page_source
     except Exception as e:
         print(e)
@@ -44,19 +51,84 @@ def get_html(driver_location: str, link: str, page_source=None):
         return page_source
 
 
-def main(path_to_driver: str, link: str, item_count: int):
-    html = get_html(path_to_driver, link)
+def get_detail_html(
+        driver, link: str,
+        page_source=None, step=1000
+):
+    sleep_time = 1
+    try:
+        driver.get(url=link)
+        time.sleep(sleep_time)
+        driver.execute_script(f"window.scrollTo(0, {step})")
+        time.sleep(1)
+        page_source = driver.page_source
+    except Exception as e:
+        print(e)
+    finally:
+        driver.close()
+        driver.quit()
+    if page_source:
+        return page_source
+
+
+def get_product_abs_link(raw_data: element.Tag) -> str:
+    return 'https://apps.microsoft.com' + raw_data['href']
+
+
+def parse_detail_link(
+        driver, link: str, parsed_apps: dict,
+        step: int
+) -> None:
+    page = get_detail_html(
+        driver, link=link, step=step
+    )
+    soup = get_soup(page)
+    app_name = re.search(r'.+- ', soup.title.text)[0][:-3]
+    company_name = soup.find('h6').parent.find_next_sibling().find('a').text
+    release_year = int(soup.find('span', attrs={
+        'class': 'c0139 c0146 c0189'
+    }).find('div').find('span').text[13:])
+
+    # TODO click_email_button = driver.find_element(By.ID, 'contactInfoButton_desktop').click()
+    parsed_apps[app_name] = {
+        'application': app_name,
+        'company_name': company_name,
+        'release_year': release_year,
+        'email': 'email'
+    }
+
+
+def main(driver_path: str, link: str):
+    driver = get_driver(driver_path)
+    html = get_main_html(driver, link)
     path_to_source_file = 'source.html'
     if html:
         with open(path_to_source_file, 'w') as file:
             file.write(html)
-        soup = get_soup_from_file(path_to_source_file)
-        product_divs = soup.find_all('a', attrs={'class': 'product_card_title title'})
-        parsed_data = get_parsed_data(product_divs[0])
+        product_links = get_links_from_file(path_to_source_file)
+        app_data = {}
+        for _ in product_links:
+            parse_detail_link(
+                link=_, parsed_apps=app_data,
+                step=1000
+            )
+            break
+        print(app_data)
+        # with Pool(2) as pool:
+        #     pool.map(parse_detail_link, product_links)
 
 
 if __name__ == '__main__':
-    link = 'https://apps.microsoft.com/store/category/Business'
+    url = 'https://apps.microsoft.com/store/category/Business'
     path_to_driver = '/home/vitali/Dev/python_proj/flask/lingvanex/chromedriver_linux64/chromedriver'
-    item_count= 200
-    main(path_to_driver, link, item_count)
+    # main(path_to_driver, url)
+    attrs = {}
+    parse_detail_link(
+        driver=get_driver(path_to_driver),
+        link='https://apps.microsoft.com/store/detail/trello/9NBLGGH4XXVW',
+        parsed_apps=attrs,
+        step=1000
+    )
+    print(attrs)
+
+
