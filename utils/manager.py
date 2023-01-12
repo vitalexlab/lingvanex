@@ -1,3 +1,4 @@
+import re
 import time
 
 from bs4 import BeautifulSoup, element
@@ -23,6 +24,9 @@ def get_web_driver(path_to_driver: str, link: str):
     browser.get(link)
     return browser
 
+def cook_nice_soup(source):
+    return BeautifulSoup(source, 'lxml')
+
 
 class MainPageParser:
     
@@ -33,11 +37,9 @@ class MainPageParser:
         self.page_source = None
         self.rolling_step = 1000
         self.iter_parsing_count = 9
-        self.sleep_time = 1
+        self.sleep_time = 0.5
         self.filename = 'source.html'
 
-    def _cook_nice_soup(self, source):
-        return BeautifulSoup(source, 'lxml')
 
     def _save_main_page_html(self, source) -> bool:
         try:
@@ -49,7 +51,7 @@ class MainPageParser:
 
     def _get_detail_link_set(self):
         source = open(self.filename, 'r', encoding='utf-8')
-        product_divs = self._cook_nice_soup(source).find_all(
+        product_divs = cook_nice_soup(source=source).find_all(
             'a', attrs={'class': 'product_card_title title'}
         )
         product_links = list(frozenset(map(get_product_abs_link, product_divs)))[:200]
@@ -68,10 +70,17 @@ class MainPageParser:
         parsed_links = self._get_detail_link_set()
         return parsed_links
 
-    def get_detail_links(self):
-        browser = get_web_driver(self.path_to_driver, self.link)
-        link_list = self._parse_main_page(driver=browser)
-        return link_list
+    def get_detail_links(self, browser=None):
+        try:
+            browser = get_web_driver(self.path_to_driver, self.link)
+            link_list = self._parse_main_page(driver=browser)
+            return link_list
+        except Exception as e:
+            print(e)
+        finally:
+            if browser:
+                browser.close()
+                browser.quit()
 
 
 class DetailParser:
@@ -80,23 +89,51 @@ class DetailParser:
         self.link = product_link
         self.path_to_driver = path_to_driver
         self.scroll_length = 1000
-        self.page_source = None
-
+        self.sleep_time = 0.1
+        self.detail_page_source = None
+        self.driver = get_web_driver(
+            self.path_to_driver, self.link
+        )
+        self.soup = None
 
     def _get_app_name(self) -> str:
-        pass
+        app_name = re.search(
+                r'.+— ', self.soup.title.text
+            )[0][:-3] or re.search(
+                r'.+- ', self.soup.title.text
+            )[0][:-3]
+        return app_name
+
 
     def _get_company_name(self) -> str:
-        pass
+        name = self.soup.find('h6').parent.find_next_sibling().find('a').text
+        return name
 
-    def _get_release_year(self) -> str:
-        pass
+    def _get_release_year(self):
+        try:
+            year = int(self.soup.find('span', attrs={
+                'class': 'c0139 c0146 c0189'
+            }).find('div').find('span').text[13:])
+            return year
+        except AttributeError:
+            return 'Not specified'
+
 
     def _get_email(self) -> str:
-        pass
+        return 'mail@mail.mail'
+
+    def _parse_detail_page(self):
+        time.sleep(self.sleep_time)
+        self.driver.execute_script(f"window.scrollTo(0, {self.scroll_length})")
+        time.sleep(self.sleep_time)
+        return self.driver.page_source
 
     def get_product_data(self) -> dict:
-        browser = get_web_driver(self.path_to_driver, self.link)
+        try:
+           self.detail_page_source = self._parse_detail_page()
+        except Exception as e:
+            print(e, 'IN A GETTING DETAIL PAGE SOURCE')
+        self.soup = cook_nice_soup(self.detail_page_source)
         app_name = self._get_app_name()
         company = self._get_company_name()
         release_year = self._get_release_year()
@@ -109,7 +146,11 @@ class DetailParser:
                 'email': email
             }
         }
+        if self.driver:
+            self.driver.close()
+            self.driver.quit()
         return product_data
+
 
 
 def parsing_manager(link: str, driver_path: str) -> dict:
@@ -118,15 +159,29 @@ def parsing_manager(link: str, driver_path: str) -> dict:
         link=link, path_to_driver=driver_path
     )
     detail_links = main_page_obj.get_detail_links()
+    link_counter = 0
     for detail_link in detail_links:
+        if link_counter == 2:
+            break
         parser_obj = DetailParser(
-            product_link=link, path_to_driver=driver_path
+            product_link=detail_link, path_to_driver=driver_path
         )
         parsed_data.update(parser_obj.get_product_data())
+        link_counter += 1
+    return parsed_data
+
+def parse_detail(link: str, path_to_driver: str) -> dict:
+    parser = DetailParser(
+        product_link=link, path_to_driver=path_to_driver
+    )
+    print(parser.get_product_data())
 
 
 if __name__ == '__main__':
     main_url = 'https://apps.microsoft.com/store/category/Business'
+    detail_url = 'https://apps.microsoft.com/store/detail/adobe-acrobat-reader-dc/XPDP273C0XHQH2'
     driver_location = '/home/vitali/Dev/python_proj/'
     'flask/lingvanex/chromedriver_linux64/chromedriver'
-    result = parsing_manager(main_url, driver_location)
+    # result = parsing_manager(main_url, driver_location)
+    result =  parse_detail(detail_url, driver_location)
+    print(result)
