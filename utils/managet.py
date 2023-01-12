@@ -8,6 +8,13 @@ from selenium.webdriver.common.by import By
 
 
 def get_links_from_file(html_path: str):
+    """To return product links from file
+
+    This func have to started only if a file with links exists
+
+    html_path - path to a file with links
+    """
+
     with open(html_path) as site_source:
         source = site_source.read()
     product_divs = get_soup(source).find_all('a', attrs={'class': 'product_card_title title'})
@@ -21,6 +28,11 @@ def get_soup(text: str):
 
 
 def get_driver(path_to_driver: str):
+    """Returns drivet object
+
+    Attention! You should exit from driver after a calling the func
+    """
+
     driver = webdriver.Chrome(executable_path=path_to_driver)
     driver.maximize_window()
     return driver
@@ -30,6 +42,17 @@ def get_main_html(
         driver, link: str,
         page_source=None, step=1000, range_=6
 ):
+    """Parsing the main page
+
+    This func requires to get:
+    - selenium driver object
+    - main page link
+    - step of scrolling
+    - range_ - a count of iterations
+
+    Returns source html code
+    """
+
     sleep_time = 1
     try:
         driver.get(url=link)
@@ -53,6 +76,16 @@ def get_detail_html(
         driver, link: str,
         page_source=None, step=1000
 ):
+    """Parsing the detail page
+
+    This func requires to get:
+    - selenium driver object
+    - link for a detail page
+    - step of scrolling
+
+    Returns source html code
+    """
+
     sleep_time = 1
     try:
         driver.get(url=link)
@@ -66,14 +99,25 @@ def get_detail_html(
         return page_source
 
 
-def get_product_abs_link(raw_data: element.Tag) -> str:
-    return 'https://apps.microsoft.com' + raw_data['href']
+def get_product_abs_link(tag_data: element.Tag) -> str:
+    """Returns an absolute url for a given Tag"""
+    return 'https://apps.microsoft.com' + tag_data['href']
 
 
 def parse_detail_link(
         driver, link: str, parsed_apps: dict,
         step: int
 ) -> None:
+    """Parses a detail page
+
+    Func requires:
+    - selenium driver object
+    - link for a detail page
+    - a dict which has already parsed data
+    - step of scrolling
+
+    Returns noting, but update parsed data dict
+    """
     page = get_detail_html(
         driver, link=link, step=step
     )
@@ -99,6 +143,7 @@ def parse_detail_link(
 
 
 def main(driver_path: str, link: str):
+    """Manager for this module funcs"""
     driver = get_driver(driver_path)
     html = get_main_html(driver, link)
     path_to_source_file = 'source.html'
