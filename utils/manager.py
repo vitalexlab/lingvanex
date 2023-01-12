@@ -29,7 +29,7 @@ def cook_nice_soup(source):
 
 
 class MainPageParser:
-    
+
     def __init__(self, link: str, path_to_driver: str):
         self.path_to_driver = path_to_driver
         self.link: str = link
@@ -97,12 +97,15 @@ class DetailParser:
         self.soup = None
 
     def _get_app_name(self) -> str:
-        app_name = re.search(
-                r'.+— ', self.soup.title.text
-            )[0][:-3] or re.search(
-                r'.+- ', self.soup.title.text
-            )[0][:-3]
-        return app_name
+        try:
+            app_name = re.search(
+                    r'.+— ', self.soup.title.text
+                )[0][:-3] or re.search(
+                    r'.+- ', self.soup.title.text
+                )[0][:-3]
+            return app_name
+        except TypeError:
+            print(f'Invalid link {self.link}')
 
 
     def _get_company_name(self) -> str:
@@ -182,6 +185,5 @@ if __name__ == '__main__':
     detail_url = 'https://apps.microsoft.com/store/detail/adobe-acrobat-reader-dc/XPDP273C0XHQH2'
     driver_location = '/home/vitali/Dev/python_proj/'
     'flask/lingvanex/chromedriver_linux64/chromedriver'
-    # result = parsing_manager(main_url, driver_location)
-    result =  parse_detail(detail_url, driver_location)
+    result = parsing_manager(main_url, driver_location)
     print(result)
