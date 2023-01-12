@@ -7,8 +7,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 
-
-
 def get_links_from_file(html_path: str):
     with open(html_path) as site_source:
         source = site_source.read()
@@ -64,9 +62,6 @@ def get_detail_html(
         page_source = driver.page_source
     except Exception as e:
         print(e)
-    finally:
-        driver.close()
-        driver.quit()
     if page_source:
         return page_source
 
@@ -83,19 +78,24 @@ def parse_detail_link(
         driver, link=link, step=step
     )
     soup = get_soup(page)
-    app_name = re.search(r'.+- ', soup.title.text)[0][:-3]
+    title = soup.title.text
+    app_name = re.search(r'.+— ', title)[0][:-3] or re.search(r'.+- ', title)[0][:-3]
     company_name = soup.find('h6').parent.find_next_sibling().find('a').text
     release_year = int(soup.find('span', attrs={
         'class': 'c0139 c0146 c0189'
     }).find('div').find('span').text[13:])
-
-    # TODO click_email_button = driver.find_element(By.ID, 'contactInfoButton_desktop').click()
+    #
+    # button = driver.find_element(By.ID, 'contactInfoButton_responsive')
+    # time.sleep(1)
+    # print(button.click())
     parsed_apps[app_name] = {
         'application': app_name,
         'company_name': company_name,
         'release_year': release_year,
         'email': 'email'
     }
+    driver.close()
+    driver.quit()
 
 
 def main(driver_path: str, link: str):
@@ -125,10 +125,8 @@ if __name__ == '__main__':
     attrs = {}
     parse_detail_link(
         driver=get_driver(path_to_driver),
-        link='https://apps.microsoft.com/store/detail/trello/9NBLGGH4XXVW',
+        link='https://apps.microsoft.com/store/detail/%D1%86%D0%B5%D0%BD%D1%82%D1%80-%D1%83%D0%BF%D1%80%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D1%8F-%D0%B3%D1%80%D0%B0%D1%84%D0%B8%D0%BA%D0%BE%D0%B9-intel%C2%AE/9PLFNLNT3G5G',
         parsed_apps=attrs,
         step=1000
     )
     print(attrs)
-
-
