@@ -7,7 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 
-def get_links_from_file(html_path: str):
+def get_links_from_file(html_path: str, source=None):
     """To return product links from file
 
     This func have to started only if a file with links exists
@@ -15,16 +15,22 @@ def get_links_from_file(html_path: str):
     html_path - path to a file with links
     """
 
-    with open(html_path) as site_source:
-        source = site_source.read()
+    with open(html_path, encoding="utf-8") as site_source:
+        try:
+            source = site_source.read()
+        except UnicodeDecodeError:
+            print(site_source)
     product_divs = get_soup(source).find_all('a', attrs={'class': 'product_card_title title'})
     product_links = list(map(get_product_abs_link, product_divs))
     return product_links
 
 
-def get_soup(text: str):
-    soup = BeautifulSoup(text, 'lxml')
-    return soup
+def get_soup(text: str, soup=None):
+    try:
+        soup = BeautifulSoup(text, 'lxml')
+        return soup
+    except Exception:
+        print(text)
 
 
 def get_driver(path_to_driver: str):
@@ -40,7 +46,7 @@ def get_driver(path_to_driver: str):
 
 def get_main_html(
         driver, link: str,
-        page_source=None, step=1000, range_=6
+        page_source=None, step=1000, range_=10
 ):
     """Parsing the main page
 
@@ -70,6 +76,8 @@ def get_main_html(
         driver.quit()
     if page_source:
         return page_source
+    else:
+        raise ValueError('There is no page source')
 
 
 def get_detail_html(
@@ -128,7 +136,6 @@ def parse_detail_link(
     release_year = int(soup.find('span', attrs={
         'class': 'c0139 c0146 c0189'
     }).find('div').find('span').text[13:])
-    #
     # button = driver.find_element(By.ID, 'contactInfoButton_responsive')
     # time.sleep(1)
     # print(button.click())
@@ -143,30 +150,36 @@ def parse_detail_link(
 
 
 def main(driver_path: str, link: str):
-    """Manager for this module funcs"""
+    """Multiproccess manager for a parsing of the given source"""
     driver = get_driver(driver_path)
     html = get_main_html(driver, link)
     path_to_source_file = 'source.html'
     if html:
-        with open(path_to_source_file, 'w') as file:
-            file.write(html)
+        with open(path_to_source_file, 'w', encoding="utf-8") as file:
+            try:
+                file.write(html)
+            except:
+                print(html)
         product_links = get_links_from_file(path_to_source_file)
         app_data = {}
         for _ in product_links:
             parse_detail_link(
+                driver=driver,
                 link=_, parsed_apps=app_data,
                 step=1000
             )
-            break
-        print(app_data)
+            time.sleep(0.5)
+        #     break
         # with Pool(2) as pool:
         #     pool.map(parse_detail_link, product_links)
+        driver.close()
+        driver.quit()
 
 
 if __name__ == '__main__':
     url = 'https://apps.microsoft.com/store/category/Business'
     path_to_driver = '/home/vitali/Dev/python_proj/flask/lingvanex/chromedriver_linux64/chromedriver'
-    # main(path_to_driver, url)
+    main(path_to_driver, url)
     attrs = {}
     parse_detail_link(
         driver=get_driver(path_to_driver),
